@@ -35,6 +35,17 @@ printf 'Source: xgc2-ros-runtime-edge\nSection: libs\nPriority: optional\nMainta
 (cd "$staging"; dpkg-shlibdeps -O -l/opt/ros/noetic/lib -e"$staging/$runtime/usr/lib/libxgc_ros_edge.so") > "$output_dir/shlibdeps.txt"
 dependencies="$(sed -n 's/^shlibs:Depends=//p' "$output_dir/shlibdeps.txt")"
 [[ -n "$dependencies" ]]
+# libroscpp.so has an unversioned SONAME: the actual amd64/arm64 ELF needs
+# ROS even when dpkg-shlibdeps reports only the system libraries. This runtime
+# package must carry that owning dependency independently of its dev package.
+dependencies="$(python3 - "$dependencies" <<'PY_ROS_RUNTIME'
+import sys
+parts=[item.strip() for item in sys.argv[1].split(',') if item.strip()]
+if not any(item.split(None,1)[0]=='ros-noetic-roscpp' for item in parts):
+    parts.append('ros-noetic-roscpp')
+print(', '.join(parts))
+PY_ROS_RUNTIME
+)"
 printf 'Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: XGC2 Team\nSection: libs\nPriority: optional\nDepends: %s\nDescription: Process-local ROS init and gate runtime\n' "$runtime" "$version" "$arch" "$dependencies" > "$staging/$runtime/DEBIAN/control"
 # These are the actual metadata owner's declared BUILD/development requirements,
 # not additions to the runtime ELF closure. Runtime itself is exact-version.
