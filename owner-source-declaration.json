@@ -1,0 +1,20 @@
+{
+  "product": "xgc2-ros-runtime-edge",
+  "repository": "XGC-Team/xgc2-ros-runtime-edge",
+  "ref": "main",
+  "parent_path": "devops/products/ros1/runtime/ros-runtime-edge",
+  "runtime_deb": "libxgc2-ros-runtime-edge",
+  "development_deb": "libxgc2-ros-runtime-edge-dev",
+  "draft_version": "0.1.0-1",
+  "config": "XgcRosRuntimeEdge",
+  "targets": [
+    "XgcRosRuntimeEdge::Edge",
+    "XgcRosRuntimeEdge::Transport"
+  ],
+  "header_prefix": "/usr/include/xgc-ros-runtime-edge",
+  "library": "/usr/lib/libxgc_ros_edge.so",
+  "status": "Selected new delivery identity/source only; no remote/parent/published/produced/floor claim",
+  "role": "Edge.cpp/hpp single init/gate/name DSO only; Transport templates neutral-only, no DSO state",
+  "moved_once": true,
+  "sealed_FS02_untouched": true
+}

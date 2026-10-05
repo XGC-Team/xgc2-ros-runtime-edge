@@ -1,0 +1,105 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_version:
+        description: Expected .xgc2/product.yml version
+        required: true
+        type: string
+      expected_source_sha:
+        description: Expected source commit SHA
+        required: true
+        type: string
+      prepare_action:
+        description: Release-train action
+        required: false
+        default: release
+        type: choice
+        options:
+          - release
+          - compatibility-verify
+      apt_overlay_url:
+        description: Optional release-scoped staging APT base URL
+        required: false
+        default: ""
+        type: string
+      dependency_set_digest:
+        description: SHA256 of the resolved release-train dependency set
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  XGC2_APT_OVERLAY_URL: ${{ inputs.apt_overlay_url }}
+  XGC2_DEPENDENCY_SET_DIGEST: ${{ inputs.dependency_set_digest }}
+
+jobs:
+  prepare-contract:
+    name: Validate prepare contract
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release-train inputs
+        env:
+          PREPARE_ACTION: ${{ inputs.prepare_action }}
+          APT_OVERLAY_URL: ${{ inputs.apt_overlay_url }}
+          DEPENDENCY_SET_DIGEST: ${{ inputs.dependency_set_digest }}
+        run: |
+          set -euo pipefail
+          case "$PREPARE_ACTION" in
+            release|compatibility-verify) ;;
+            *)
+              echo "unsupported prepare_action: $PREPARE_ACTION" >&2
+              exit 1
+              ;;
+          esac
+          if [[ -n "$DEPENDENCY_SET_DIGEST" && ! "$DEPENDENCY_SET_DIGEST" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "dependency_set_digest must be empty or 64 lowercase hex characters" >&2
+            exit 1
+          fi
+          if [[ -n "$APT_OVERLAY_URL" && ! "$DEPENDENCY_SET_DIGEST" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "apt_overlay_url requires a dependency_set_digest" >&2
+            exit 1
+          fi
+  validate:
+    needs: prepare-contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          test "$(awk -F': *' '/^version:/ {print $2; exit}' .xgc2/product.yml)" = "${{ inputs.expected_version }}"
+          test "$(git rev-parse HEAD)" = "${{ inputs.expected_source_sha }}"
+  build:
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {arch: amd64, runner: ubuntu-latest}
+          - {arch: arm64, runner: ubuntu-24.04-arm}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release-train build
+        run: .xgc2/scripts/build_debs_in_docker.sh --output-dir "$GITHUB_WORKSPACE/debs"
+      - name: Create release-train build manifest
+        run: |
+          python3 .xgc2/scripts/xgc2_artifact_manifest.py build \
+            --deb-dir debs --output-dir .ci/build-manifests \
+            --product xgc2-ros-runtime-edge --product-version "${{ inputs.expected_version }}" \
+            --distribution focal --architecture "${{ matrix.arch }}" \
+            --source-sha "${{ inputs.expected_source_sha }}" --ci-run-id "$GITHUB_RUN_ID" \
+            --ci-workflow "$GITHUB_WORKFLOW" --ci-workflow-ref "$GITHUB_WORKFLOW_REF"
+      - uses: actions/upload-artifact@v4
+        if: ${{ inputs.prepare_action == 'release' }}
+        with:
+          name: xgc2-ros-runtime-edge-debs-${{ matrix.arch }}
+          path: |
+            debs/*.deb
+            .ci/build-manifests/*.json
+          retention-days: 14
+          include-hidden-files: true

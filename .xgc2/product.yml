@@ -1,0 +1,40 @@
+schema: xgc2.product.v1
+id: xgc2-ros-runtime-edge
+name: XGC2 ROS Runtime Edge
+version: 0.1.0-1
+kind: ros1-apt
+summary: Single process-local ROS init/gate DSO and neutral-only attitude, pose and position
+  transport headers; simulation owners and interfaces remain in Lightweight Simulator.
+ros:
+  distro: noetic
+apt:
+  distribution: focal
+  install: &id001
+  - libxgc2-ros-runtime-edge
+  - libxgc2-ros-runtime-edge-dev
+  packages: *id001
+  package_architectures:
+    libxgc2-ros-runtime-edge: &id002
+    - amd64
+    - arm64
+    libxgc2-ros-runtime-edge-dev: *id002
+  depends:
+  - libxgc2-runtime-sdk-dev (>= 0.1.0-2~focal)
+  - libxgc2-robotics-interfaces-dev (>= 0.1.0-1~focal)
+  - ros-noetic-roscpp
+release:
+  repository: XGC-Team/xgc2-ros-runtime-edge
+  ref: main
+  requires:
+  - libxgc2-runtime-sdk-dev
+  - libxgc2-robotics-interfaces-dev
+  dependency_policy:
+    libxgc2-runtime-sdk-dev: rebuild
+    libxgc2-robotics-interfaces-dev: rebuild
+  apt_versions:
+    focal: 0.1.0-1
+ownership:
+  paths:
+  - /usr/lib/libxgc_ros_edge.so
+  - /usr/include/xgc-ros-runtime-edge
+  - /usr/share/cmake/XgcRosRuntimeEdge
